@@ -7,10 +7,11 @@ const { ApolloServerPluginLandingPageGraphQLPlayground } = require('apollo-serve
 admin.initializeApp();
 
 const db = admin.firestore();
+db.settings({ ignoreUndefinedProperties: true });
 const typeDefs = gql`
     type Query {
-        users(query: string): [User!]
-        cohorts(query: string): [Cohort!]
+        users(query: String): [User!]
+        cohorts(query: String): [Cohort!]
     }
     type User {
         uid: String
@@ -19,7 +20,7 @@ const typeDefs = gql`
         email: String
         last_login: String
         token: String
-        active_cohort: String
+        active_cohort: [Cohort]
     }
     type Cohort {
         name: String
@@ -31,18 +32,39 @@ const typeDefs = gql`
 
 const resolvers = {
     Query: {
-        users: () => {
-            return new Promise((resolve, reject) => {
-                fetchAllUsers((data: any) => {
-                    resolve(data);
+        users: (parent: any, args: any, ctx: any, info:any) => {
+            //If an argument is not passed to the query
+            if(!args.query) {
+                return new Promise((resolve, reject) => {
+                    fetchAllUsers((data: any) => {
+                        resolve(data);
+                    });
                 });
-            });
+            }
+            //Typescript throws an error if a function path doesn't return a value, so this area below is for if we ever want to resolve query arguments
+            else {
+                return new Promise((resolve, reject) => {
+                    fetchAllUsers((data: any) => {
+                        resolve(data);
+                    });
+                });
+            }
         },
         cohorts: () => {
             return new Promise((resolve, reject) => {
                 fetchAllCohorts((data: any) => {
                     resolve(data);
                 });
+            });
+        },
+    },
+    User: {
+        active_cohort: (parent: any, args: any, ctx: any, info:any) => {
+            let cohortID: string = parent.active_cohort;
+            return new Promise((resolve, reject) => {
+                fetchCohort((data: any) => {
+                    resolve(data);
+                }, cohortID);
             });
         },
     }
@@ -61,9 +83,37 @@ const fetchAllUsers = (callback: any) => {
         })
         .catch(e => console.log(e));
 };
+// const fetchUser = (callback: any, userID: string) => {
+//     db.collection('users')
+//         .where("uid", "==", userID)
+//         .get()
+//         .then((item: any) => {
+//             const items: any = [];
+//             item.docs.forEach((item: { data: () => any; }) => {
+//                 console.log('Adding...')
+//                 items.push(item.data())
+//             });
+//             return callback(items);
+//         })
+//         .catch(e => console.log(e));
+// };
 
 const fetchAllCohorts = (callback: any) => {
     db.collection('cohorts')
+        .get()
+        .then((item: any) => {
+            const items: any = [];
+            item.docs.forEach((item: { data: () => any; }) => {
+                console.log('Adding...')
+                items.push(item.data())
+            });
+            return callback(items);
+        })
+        .catch(e => console.log(e));
+};
+const fetchCohort = (callback: any, cohortID: string) => {
+    db.collection('cohorts')
+        .where("classroom_id", "==", cohortID)
         .get()
         .then((item: any) => {
             const items: any = [];
@@ -79,6 +129,7 @@ const fetchAllCohorts = (callback: any) => {
 const graphqlConfig: Config<ExpressContext> = {
     typeDefs,
     resolvers,
+    introspection: true,
     plugins: [
         ApolloServerPluginLandingPageGraphQLPlayground({
           // options
