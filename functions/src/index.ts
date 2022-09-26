@@ -10,8 +10,18 @@ const db = admin.firestore();
 db.settings({ ignoreUndefinedProperties: true });
 const typeDefs = gql`
     type Query {
+        getMe(query: String!): [Me!]
         users(query: String): [User!]
         cohorts(query: String): [Cohort!]
+    }
+    type Me {
+        uid: String
+        first_name: String
+        last_name: String
+        email: String
+        last_login: String
+        token: String
+        active_cohort: [Cohort]
     }
     type User {
         uid: String
@@ -27,11 +37,19 @@ const typeDefs = gql`
         class_code: String
         classroom_id: String
         update_time: String
+
     }
 `;
 
 const resolvers = {
     Query: {
+        getMe: (parent: any, args: any, ctx: any, info:any) => {
+            return new Promise((resolve, reject) => {
+                fetchUser((data: any) => {
+                    resolve(data);
+                }, args.query);
+            });
+        },
         users: (parent: any, args: any, ctx: any, info:any) => {
             //If an argument is not passed to the query
             if(!args.query) {
@@ -83,20 +101,20 @@ const fetchAllUsers = (callback: any) => {
         })
         .catch(e => console.log(e));
 };
-// const fetchUser = (callback: any, userID: string) => {
-//     db.collection('users')
-//         .where("uid", "==", userID)
-//         .get()
-//         .then((item: any) => {
-//             const items: any = [];
-//             item.docs.forEach((item: { data: () => any; }) => {
-//                 console.log('Adding...')
-//                 items.push(item.data())
-//             });
-//             return callback(items);
-//         })
-//         .catch(e => console.log(e));
-// };
+const fetchUser = (callback: any, userID: string) => {
+    db.collection('users')
+        .where("uid", "==", userID)
+        .get()
+        .then((item: any) => {
+            const items: any = [];
+            item.docs.forEach((item: { data: () => any; }) => {
+                console.log('Adding...')
+                items.push(item.data())
+            });
+            return callback(items);
+        })
+        .catch(e => console.log(e));
+};
 
 const fetchAllCohorts = (callback: any) => {
     db.collection('cohorts')
